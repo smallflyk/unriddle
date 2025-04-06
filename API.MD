@@ -1,5 +1,5 @@
 模型：openrouter 
-API KEY：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
+API KEY：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
 api文档内容：import OpenAI from 'openai';
 
 const openai = new OpenAI({

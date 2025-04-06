@@ -50,6 +50,8 @@ export default function PdfToolPage() {
     setResult('');
 
     try {
+      console.log('发送请求到 /api/analyze-pdf');
+      
       const response = await fetch('/api/analyze-pdf', {
         method: 'POST',
         headers: {
@@ -63,12 +65,18 @@ export default function PdfToolPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || '处理请求时出错');
+        console.error('API响应错误:', data);
+        throw new Error(data.error || `处理请求时出错 (${response.status})`);
+      }
+
+      if (!data.content) {
+        throw new Error('返回的内容为空');
       }
 
       setResult(data.content);
       setUploadStep('analyze');
     } catch (err) {
+      console.error('请求处理错误:', err);
       setError(err instanceof Error ? err.message : '未知错误');
     } finally {
       setLoading(false);

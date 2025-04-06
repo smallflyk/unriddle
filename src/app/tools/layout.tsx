@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { FaFileAlt, FaFilePdf, FaFlask, FaHome } from "react-icons/fa";
 
 export default function ToolsLayout({
@@ -10,6 +11,35 @@ export default function ToolsLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(true); // 默认为true避免闪烁
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // 检查登录状态
+  useEffect(() => {
+    // 这个效果只在客户端运行
+    const checkLoginStatus = () => {
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      setIsLoggedIn(isLoggedIn);
+      setIsCheckingAuth(false);
+      
+      // 如果未登录，重定向到登录页面
+      if (!isLoggedIn) {
+        router.push('/login?redirect=' + encodeURIComponent(pathname));
+      }
+    };
+    
+    checkLoginStatus();
+  }, [pathname, router]);
+
+  // 加载中或未登录时显示的内容
+  if (isCheckingAuth) {
+    return <div className="pt-32 text-center">正在加载...</div>;
+  }
+  
+  if (!isLoggedIn) {
+    return <div className="pt-32 text-center">未登录，即将跳转到登录页面...</div>;
+  }
 
   const navigation = [
     { name: "首页", href: "/", icon: <FaHome /> },
