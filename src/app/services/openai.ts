@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 // 获取API密钥
-const apiKey = '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';
+const apiKey = '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';
 
 // 添加调试信息
 console.log('使用的API密钥长度:', apiKey.length);
@@ -14,6 +14,7 @@ const openai = new OpenAI({
     'HTTP-Referer': 'https://unriddle.ai', // Site URL for rankings on openrouter.ai
     'X-Title': 'Unriddle Academic Assistant', // Site title for rankings on openrouter.ai
   },
+  timeout: 30000, // 设置30秒超时
 });
 
 // 打印配置状态，帮助调试
@@ -187,6 +188,7 @@ export async function processText(text: string, type: TextProcessingType): Promi
       
       console.log('API请求结束时间:', new Date().toISOString());
       console.log('API返回结果状态:', completion.choices ? '成功' : '失败');
+      console.log('API返回结果详情:', JSON.stringify(completion, null, 2));
 
       if (!completion.choices || completion.choices.length === 0) {
         throw new Error('API返回的结果不包含任何选项');
@@ -205,6 +207,24 @@ export async function processText(text: string, type: TextProcessingType): Promi
       };
     } catch (apiError) {
       console.error(`使用模型 ${modelToUse} 调用失败:`, apiError);
+      
+      // 增强错误日志，记录更多信息
+      if (apiError instanceof Error) {
+        console.error('错误名称:', apiError.name);
+        console.error('错误消息:', apiError.message);
+        console.error('错误堆栈:', apiError.stack);
+        
+        // 记录更多的错误属性
+        const errorObj = apiError as any;
+        if (errorObj.response) {
+          console.error('API错误响应:', JSON.stringify(errorObj.response, null, 2));
+        }
+        if (errorObj.status) {
+          console.error('API错误状态码:', errorObj.status);
+        }
+      } else {
+        console.error('未知类型的API错误:', JSON.stringify(apiError, null, 2));
+      }
       
       // 如果使用主模型失败，尝试备用模型
       if (modelToUse === 'openai/gpt-4o') {
@@ -230,6 +250,8 @@ export async function processText(text: string, type: TextProcessingType): Promi
             max_tokens: 2000,
           });
           
+          console.log('备用API请求完成，结果:', JSON.stringify(backupCompletion, null, 2));
+          
           if (!backupCompletion.choices || backupCompletion.choices.length === 0) {
             throw new Error('备用API返回的结果不包含任何选项');
           }
@@ -246,10 +268,41 @@ export async function processText(text: string, type: TextProcessingType): Promi
           };
         } catch (backupError) {
           console.error('备用模型也调用失败:', backupError);
-          throw apiError; // 抛出原始错误
+          
+          // 增强备用错误日志
+          if (backupError instanceof Error) {
+            console.error('备用错误名称:', backupError.name);
+            console.error('备用错误消息:', backupError.message);
+            console.error('备用错误堆栈:', backupError.stack);
+            
+            // 记录备用错误的其他属性
+            const errorObj = backupError as any;
+            if (errorObj.response) {
+              console.error('备用API错误响应:', JSON.stringify(errorObj.response, null, 2));
+            }
+            if (errorObj.status) {
+              console.error('备用API错误状态码:', errorObj.status);
+            }
+          }
+          
+          // 提供明确的错误信息
+          return {
+            content: '',
+            success: false,
+            error: backupError instanceof Error 
+                  ? `备用API调用失败: ${backupError.message}` 
+                  : '备用API调用失败，请检查网络连接或API配置'
+          };
         }
       } else {
-        throw apiError;
+        // 提供明确的错误信息
+        return {
+          content: '',
+          success: false,
+          error: apiError instanceof Error 
+                ? `API调用失败: ${apiError.message}` 
+                : '未知API错误，请检查网络连接或API配置'
+        };
       }
     }
   } catch (error) {
@@ -282,6 +335,9 @@ export async function processText(text: string, type: TextProcessingType): Promi
       } else {
         errorMessage = `处理失败: ${error.message}`;
       }
+    } else if (typeof error === 'object' && error !== null) {
+      // 尝试从对象中提取信息
+      errorMessage = `处理失败: ${JSON.stringify(error)}`;
     }
     
     return {

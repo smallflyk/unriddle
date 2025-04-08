@@ -229,7 +229,7 @@ export default function ToolsPage() {
       console.log('发送请求到 /api/analyze, 类型:', processType);
       console.log('文本长度:', inputText.length);
       
-      // 添加10秒超时
+      // 添加30秒超时
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
@@ -258,8 +258,27 @@ export default function ToolsPage() {
           responseText = await response.text();
           console.log('API原始响应:', responseText);
           
+          // 检查响应文本是否为空
+          if (!responseText || responseText.trim() === '') {
+            console.error('API返回的响应文本为空');
+            throw new Error('服务器返回了空响应，请检查服务器日志');
+          }
+          
           // 尝试解析为JSON
-          let data = JSON.parse(responseText);
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch (jsonError) {
+            console.error('JSON解析错误:', jsonError);
+            console.error('无法解析的响应内容:', responseText);
+            throw new Error(`服务器响应无法解析为JSON: ${responseText.substring(0, 100)}...`);
+          }
+          
+          // 检查解析后的数据是否为空对象
+          if (data && Object.keys(data).length === 0) {
+            console.error('API返回了空对象:', data);
+            throw new Error('服务器返回了空对象，请检查OpenRouter API配置');
+          }
           
           if (!response.ok) {
             // 记录更多响应信息，帮助调试
@@ -270,25 +289,42 @@ export default function ToolsPage() {
               url: response.url
             });
             
-            throw new Error(data?.error || `处理请求时出错 (${response.status}: ${response.statusText})`);
+            // 如果有详细错误信息，则包含它
+            let errorMsg = data?.error || `处理请求时出错 (${response.status}: ${response.statusText})`;
+            if (data?.details) {
+              errorMsg += `\n\n详细信息: ${data.details}`;
+            }
+            
+            throw new Error(errorMsg);
           }
 
           if (!data || !data.content) {
             console.error('API返回的内容为空或格式不正确:', data);
-            throw new Error('API返回的内容为空或格式不正确');
+            // 如果有详细错误信息，则包含它
+            let errorMsg = 'API返回的内容为空或格式不正确';
+            if (data?.details) {
+              errorMsg += `\n\n详细信息: ${data.details}`;
+            }
+            throw new Error(errorMsg);
           }
 
           setResult(data.content);
         } catch (parseError: any) {
-          console.error('响应数据解析错误:', parseError);
-          console.error('无法解析的响应内容:', responseText);
-          throw new Error(`无法解析API响应 (状态码: ${response.status}): ${parseError.message}`);
+          console.error('响应数据处理错误:', parseError);
+          console.error('响应内容:', responseText);
+          
+          if (parseError.message.includes('JSON')) {
+            // 如果是JSON解析错误，返回带有原始响应文本的错误
+            throw new Error(`无法解析API响应 (状态码: ${response.status}): ${parseError.message}. 响应内容: ${responseText.substring(0, 100)}...`);
+          } else {
+            throw new Error(`API响应处理错误 (状态码: ${response.status}): ${parseError.message}`);
+          }
         }
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
           console.error('请求超时，已终止');
-          throw new Error('API请求超时，请稍后重试');
+          throw new Error('API请求超时，请稍后重试或尝试较短的文本');
         }
         throw fetchError;
       }
@@ -296,9 +332,21 @@ export default function ToolsPage() {
       console.error('请求处理错误:', err);
       // 显示更详细的错误信息
       if (err instanceof Error) {
-        setError(`处理失败: ${err.message}`);
+        // 增强错误显示
+        const errorMessage = err.message || '未知错误';
+        const errorName = err.name || 'Error';
+        setError(`处理失败: [${errorName}] ${errorMessage}`);
+        
+        // 如果错误信息中包含"OpenRouter API"，提供更具体的建议
+        if (errorMessage.includes('OpenRouter') || errorMessage.includes('API')) {
+          setError(`处理失败: [${errorName}] ${errorMessage}\n\n可能是API密钥问题，请联系管理员检查API配置。`);
+        }
+      } else if (err === null || err === undefined) {
+        setError('处理失败，发生了未知错误（null/undefined）');
+      } else if (typeof err === 'object') {
+        setError(`处理失败，错误详情: ${JSON.stringify(err)}`);
       } else {
-        setError('处理失败，服务器未返回错误详情');
+        setError(`处理失败，服务器未返回错误详情: ${String(err)}`);
       }
     } finally {
       setLoading(false);
@@ -466,7 +514,27 @@ export default function ToolsPage() {
 
             {error && (
               <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
-                {error}
+                <p className="mb-2 font-semibold">错误信息:</p>
+                <p className="whitespace-pre-line">{error}</p>
+                <p className="mt-4 text-sm">
+                  <button 
+                    onClick={() => {
+                      // 添加测试处理
+                      setInputText("测试服务连接");
+                      setProcessType("summarize");
+                    }}
+                    className="underline text-red-600 hover:text-red-800"
+                  >
+                    尝试发送测试请求
+                  </button>
+                  {' | '}
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="underline text-red-600 hover:text-red-800"
+                  >
+                    刷新页面
+                  </button>
+                </p>
               </div>
             )}
 

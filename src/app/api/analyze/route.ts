@@ -75,18 +75,36 @@ You can try using shorter text directly for testing, or try again later.`,
     
     // 调用OpenAI服务处理文本
     try {
+      // 记录发送到OpenAI服务的数据
+      console.log('调用OpenAI服务:', {
+        textLength: text.length,
+        textPreview: text.length > 100 ? text.substring(0, 100) + '...' : text,
+        type: type
+      });
+      
       const result = await processText(text, type as TextProcessingType);
+      
       console.log('处理结果:', {
         success: result.success,
         hasContent: !!result.content,
         contentLength: result.content?.length || 0,
-        error: result.error || '无错误'
+        error: result.error || '无错误',
+        resultPreview: result.content && result.content.length > 100 ? result.content.substring(0, 100) + '...' : '无内容'
       });
 
       if (!result.success) {
         console.error('处理文本失败:', result.error);
+        
+        // 增强错误信息
+        const errorMessage = result.error || '调用OpenAI服务处理文本时出错';
+        console.error('详细错误信息:', errorMessage);
+        
         return NextResponse.json(
-          { error: result.error || '处理文本时出错', success: false },
+          { 
+            error: errorMessage, 
+            success: false,
+            details: '请检查API密钥和网络连接' 
+          },
           { status: 500 }
         );
       }
@@ -95,7 +113,11 @@ You can try using shorter text directly for testing, or try again later.`,
       if (!result.content || result.content.trim() === '') {
         console.error('API返回的内容为空');
         return NextResponse.json(
-          { error: 'AI服务返回了空内容', success: false },
+          { 
+            error: 'AI服务返回了空内容', 
+            success: false,
+            details: '请检查API配置或网络连接'
+          },
           { status: 500 }
         );
       }
@@ -109,8 +131,28 @@ You can try using shorter text directly for testing, or try again later.`,
       });
     } catch (openaiError: any) {
       console.error('OpenAI API错误:', openaiError);
+      
+      // 增强错误记录
+      let errorInfo = '未知错误';
+      let errorDetails = '无附加信息';
+      
+      if (openaiError instanceof Error) {
+        errorInfo = openaiError.message;
+        errorDetails = openaiError.stack || '无堆栈信息';
+        console.error('错误类型:', openaiError.constructor.name);
+        console.error('错误堆栈:', openaiError.stack);
+      } else if (typeof openaiError === 'object' && openaiError !== null) {
+        try {
+          errorInfo = JSON.stringify(openaiError);
+          errorDetails = '请查看服务器日志获取更多信息';
+        } catch (e) {
+          errorInfo = 'API错误（无法序列化）';
+        }
+      }
+      
       return NextResponse.json({
-        error: `OpenAI API错误: ${openaiError.message || '未知错误'}`,
+        error: `OpenAI API错误: ${errorInfo}`,
+        details: errorDetails,
         success: false
       }, { status: 500 });
     }
@@ -118,19 +160,29 @@ You can try using shorter text directly for testing, or try again later.`,
     // 记录详细错误信息
     console.error('API处理错误:', error);
     let errorMessage = '服务器处理请求时出错';
+    let errorDetails = '请检查服务器日志';
     
     if (error instanceof Error) {
       console.error('错误类型:', error.name);
       console.error('错误详情:', error.message);
       console.error('错误堆栈:', error.stack);
       errorMessage = `服务器错误: ${error.message}`;
+      errorDetails = error.stack || '无堆栈信息';
+    } else if (typeof error === 'object' && error !== null) {
+      try {
+        errorMessage = `服务器错误: ${JSON.stringify(error)}`;
+        errorDetails = '未捕获的异常对象';
+      } catch (e) {
+        errorMessage = '服务器错误（无法序列化）';
+      }
     }
     
     // 尝试生成回退响应
     let fallbackResponse = {
-      content: '很抱歉，处理请求时遇到问题。请稍后再试或联系支持团队。',
+      content: '',
       success: false,
-      error: errorMessage
+      error: errorMessage,
+      details: errorDetails
     };
     
     // 返回格式化的错误响应
