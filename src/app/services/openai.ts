@@ -62,6 +62,12 @@ export type TextProcessingType =
  * @returns 演示响应内容
  */
 function getDemoResponse(text: string, type: TextProcessingType, language: 'en' | 'zh' | 'other'): string {
+  // 尝试使用新函数替代旧功能
+  if (!text) {
+    // 如果没有文本，使用getDemoModeContent
+    return getDemoModeContent(type, language === 'zh' ? 'zh' : 'en');
+  }
+  
   const isZh = language === 'zh';
   const shortText = text.length > 100 ? text.substring(0, 100) + '...' : text;
   
