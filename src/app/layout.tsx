@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
   title: "Unriddle | 智能学术研究助手 | 轻松揭示研究洞见",
   description: "Unriddle是一款强大的学术研究助手，帮助研究人员快速搜索、分析和理解学术文献，大幅提升研究效率。我们的AI技术能够从超过1亿篇论文中提取关键洞见，生成高质量摘要，并支持系统性文献综述。",
   keywords: "Unriddle, 学术研究, 智能助手, AI研究工具, 文献分析, 学术搜索, 研究效率, 文献综述工具, PDF分析, 学术写作辅助",
+  metadataBase: new URL("https://unriddle.ai"),
   openGraph: {
     type: "website",
     locale: "zh_CN",
@@ -47,6 +49,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" className={inter.variable}>
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-LGS72Z0MZW"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){window.dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-LGS72Z0MZW');
+          `}
+        </Script>
+      </head>
       <body className="antialiased">
         {children}
       </body>
